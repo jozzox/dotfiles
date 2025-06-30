@@ -1,0 +1,25 @@
+# SENSIBLE DATEIEN/VERZEICHNISSE – NICHT AUF GITHUB PUSHEN!
+
+# Backup-Verzeichnisse
+../dotfiles_backups/
+
+# Sensible Daten
+.config/BraveSoftware
+.config/chromium
+.config/Code/User/globalStorage
+.config/Code/User/sync
+.config/containers/auth.json
+.config/gh/hosts.yml
+.config/github-copilot
+.config/google-chrome
+.config/keepassxc
+.config/microsoft-edge
+.config/vivaldi
+.dotnet
+.gnupg
+.mozilla
+.pki
+.ssh
+
+# Diese .gitignore schützt sensible Daten vor versehentlichem Push.
+# Ergänze bei Bedarf weitere sensible Dateien/Ordner.
