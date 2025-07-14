@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "env": {
+        "SERVER_URL": null,
+        "API_KEY": "",
+        "DEBUG": "true"
+      },
+      "disabled": false,
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "command": "uvx"
+    }
+  },
+  "nativeMCPServers": {}
+}

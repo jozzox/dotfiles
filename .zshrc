@@ -140,11 +140,24 @@ function pathprepend() {
 
 # Add the most common personal binary paths located inside the home folder
 # (these directories are only added if they exist)
-pathprepend "$HOME/bin" "$HOME/sbin" "$HOME/.local/bin" "$HOME/local/bin" "$HOME/.bin" "$HOME/.local/myscripts" "$(go env GOPATH)/bin"
+local -a user_paths
+user_paths=(
+    "$HOME/.bun/bin"
+    "$HOME/.deno/bin"
+    "$HOME/.dprint/bin"
+    "$HOME/bin"
+    "$HOME/sbin"
+    "$HOME/.local/bin"
+    "$HOME/local/bin"
+    "$HOME/.bin"
+    "$HOME/.local/myscripts"
+    "$(go env GOPATH)/bin"
+)
+pathprepend "${user_paths[@]}"
 
 # Check for the Rust package manager binary install location
 # Link: https://doc.rust-lang.org/cargo/index.html
-pathappend "$HOME/.cargo/bin" "$(go env GOPATH)/bin"
+pathappend "$HOME/.cargo/bin"
 
 #Yazi
 # y shell wrapper that provides the ability to change the current working directory when exiting Yazi.
@@ -243,11 +256,7 @@ source ~/.config/zsh/zsh-syntax-highlightin-tokyonight.zsh
 source <(fzf --zsh)
 
 # Installation für oh-my-posh Zen
-export PATH=$PATH:/home/tux/.local/bin
 eval "$(oh-my-posh init zsh --config $HOME/.config/ohmyposh/zen.toml)"
-
-# zwecks ruby
-export PATH="$HOME/bin:$PATH"
 
 # Load local config-keys if it exists
 [[ -f "$HOME/.zshrc.local" ]] && . "$HOME/.zshrc.local"
@@ -260,11 +269,10 @@ if [[ -f "$HOME/.env" ]]; then
 fi
 
 # bun completions
-[ -s "/home/tux/.bun/_bun" ] && source "/home/tux/.bun/_bun"
+[ -s "/home/tux/.bun/_bun" ] && source "/home/tux/.bun/_bun" ]
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
 
 # Mise
 eval "$(mise activate zsh)"
