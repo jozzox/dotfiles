@@ -2,7 +2,7 @@
 
 Willkommen zu meinen persönlichen dotfiles! 👨‍💻
 
-Diese Sammlung enthält sorgfältig konfigurierte Einstellungen, Skripte und Tools,  Sie helfen dabei, Effizienz, Sicherheit und Automation in der täglichen Arbeit zu steigern.
+Diese Sammlung enthält sorgfältig konfigurierte Einstellungen, Skripte und Tools, Sie helfen dabei, Effizienz, Sicherheit und Automation in der täglichen Arbeit zu steigern.
 
 ## Features 🚀
 
@@ -15,10 +15,10 @@ Diese Sammlung enthält sorgfältig konfigurierte Einstellungen, Skripte und Too
 
 - **Shell:** Zsh mit [zinit](https://github.com/zdharma/zinit) als Plugin-Manager
 - **Theme:** [Tokyonight](https://github.com/folke/tokyonight) von folke für Terminal und Editor
-- **Editor:** Neovim mit  Tokyonight-Theme
+- **Editor:** Neovim mit Tokyonight-Theme
 - **GUI:** VS Code mit Tokyonight-Theme Icons catppuccin
-- **Terminal:** Kitty  mit Tokyonight-Farbschema
-- **Tools:** fzf, bat, ripgrep, lsd, btop, lazygit,
+- **Terminal:** Kitty, Yazi mit Tokyonight-Farbschema
+- **Tools:** fzf, ripgrep, lsd, btop, lazygit
 - **OS:** Fedora 42 mit KDE Plasma Flavor
 
 ## Zsh-Konfiguration ⚙️
