@@ -24,16 +24,13 @@ zinit snippet OMZP::command-not-found
 zinit snippet OMZP::podman
 #zinit snippet OMZP::docker
 
-# Disable the cursor style feature
-# ZVM_CURSOR_STYLE_ENABLED=false
-ZVM_INSERT_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BEAM
-ZVM_NORMAL_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BLOCK
-ZVM_OPPEND_MODE_CURSOR=$ZVM_CURSOR_BLINKING_UNDERLINE
-
 # Load completions
 autoload -Uz compinit && compinit
 
-zinit cdreplay -q
+# Disable the cursor style feature
+ZVM_INSERT_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BEAM
+ZVM_NORMAL_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BLOCK
+ZVM_OPPEND_MODE_CURSOR=$ZVM_CURSOR_BLINKING_UNDERLINE
 
 #######################################################
 # ZSH Basic Options
@@ -51,8 +48,6 @@ setopt promptsubst         # enable command substitution in prompt
 #######################################################
 # Environment Variables
 #######################################################
-# export EDITOR=nvim
-# export VISUAL=nvim
 export EDITOR="nvim"
 export VISUAL="nvim"
 export SUDO_EDITOR=nvim
@@ -113,7 +108,6 @@ zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*' menu no
 zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
 zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
-zstyle ':completion:*:*:podman:*' option-stacking yes
 zstyle ':completion:*:*:podman-*:*' option-stacking yes
 
 # Add Common Binary Directories to Path
@@ -269,7 +263,7 @@ if [[ -f "$HOME/.env" ]]; then
 fi
 
 # bun completions
-[ -s "/home/tux/.bun/_bun" ] && source "/home/tux/.bun/_bun" ]
+[ -s "/home/tux/.bun/_bun" ] && source "/home/tux/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
