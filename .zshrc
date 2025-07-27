@@ -183,7 +183,7 @@ fi
 # Alias Sytem
 alias sz='source ~/.zshrc'
 alias szu='zinit update'
-alias syu='sudo dnf upgrade'
+alias syu='sudo dnf upgrade --force'
 alias syi='sudo dnf -y install'
 alias ping='grc ping -c 5'
 alias nmap='grc nmap'
