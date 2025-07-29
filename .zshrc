@@ -24,8 +24,20 @@ zinit snippet OMZP::command-not-found
 zinit snippet OMZP::podman
 #zinit snippet OMZP::docker
 
-# Load completions
-autoload -Uz compinit && compinit
+# Fix for compinit error with stale completion cache
+# This prevents errors from missing completion files
+if [ -f "$HOME/.zcompdump" ]; then
+    # Check for various problematic completion files that might cause errors
+    if grep -q '_yfm\|_missing_\|_nonexistent' "$HOME/.zcompdump" 2>/dev/null; then
+        echo "Stale completion cache detected. Cleaning up..."
+        rm -f "$HOME/.zcompdump"*
+        [ -d "${ZINIT_HOME%/*}/completions" ] && rm -rf "${ZINIT_HOME%/*}/completions"
+        echo "Completion caches cleared."
+    fi
+fi
+
+# Load completions with security check
+autoload -Uz compinit && compinit -u
 
 # Disable the cursor style feature
 ZVM_INSERT_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BEAM
@@ -183,7 +195,7 @@ fi
 # Alias Sytem
 alias sz='source ~/.zshrc'
 alias szu='zinit update'
-alias syu='sudo dnf upgrade --force'
+alias syu='sudo dnf upgrade'
 alias syi='sudo dnf -y install'
 alias ping='grc ping -c 5'
 alias nmap='grc nmap'
