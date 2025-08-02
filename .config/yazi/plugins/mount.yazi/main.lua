@@ -1,32 +1,71 @@
--- @version 2
--- A plugin to mount, unmount, and eject partitions.
---
--- This is an updated version of the original mount plugin, rewritten to use
--- modern, asynchronous Yazi APIs.
+--- @since 25.5.31
+local toggle_ui = ya.sync(function(self)
+	if self.children then
+		Modal:children_remove(self.children)
+		self.children = nil
+	else
+		self.children = Modal:children_add(self, 10)
+	end
 
-local async = require("yazi-plugin.async")
-local child_process = require("yazi-plugin.child_process")
-local event = require("yazi-plugin.event")
+	-- TODO: remove this
+	if ui.render then
+		ui.render()
+	else
+		ya.render()
+	end
+end)
+
+local subscribe = ya.sync(function(self)
+	ps.unsub("mount")
+	ps.sub("mount", function()
+		ya.emit("plugin", { self._id, "refresh" })
+	end)
+end)
+
+local update_partitions = ya.sync(function(self, partitions)
+	self.partitions = partitions
+	self.cursor = math.max(0, math.min(self.cursor or 0, #self.partitions - 1))
+
+	-- TODO: remove this
+	if ui.render then
+		ui.render()
+	else
+		ya.render()
+	end
+end)
+
+local active_partition = ya.sync(function(self)
+	return self.partitions[self.cursor + 1]
+end)
+
+local update_cursor = ya.sync(function(self, cursor)
+	if #self.partitions == 0 then
+		self.cursor = 0
+	else
+		self.cursor = ya.clamp(0, self.cursor + cursor, #self.partitions - 1)
+	end
+
+	-- TODO: remove this
+	if ui.render then
+		ui.render()
+	else
+		ya.render()
+	end
+end)
 
 local M = {
 	keys = {
-		{ on = "q", run = "quit", desc = "Quit the mount manager" },
-
-		{ on = "k", run = "up", desc = "Move cursor up" },
-		{ on = "j", run = "down", desc = "Move cursor down" },
-		{ on = "l", run = { "enter", "quit" }, desc = "Enter the selected mount point" },
-
-		{ on = "<Up>", run = "up", desc = "Move cursor up" },
-		{ on = "<Down>", run = "down", desc = "Move cursor down" },
-		{ on = "<Right>", run = { "enter", "quit" }, desc = "Enter the selected mount point" },
-
-		{ on = "m", run = "mount", desc = "Mount the selected partition" },
-		{ on = "u", run = "unmount", desc = "Unmount the selected partition" },
-		{ on = "e", run = "eject", desc = "Eject the selected device" },
+		{ on = "q", run = "quit" },
+		{ on = "k", run = "up" },
+		{ on = "j", run = "down" },
+		{ on = "l", run = { "enter", "quit" } },
+		{ on = "<up>", run = "up" },
+		{ on = "<down>", run = "down" },
+		{ on = "<enter>", run = { "enter", "quit" } },
+		{ on = "m", run = "mount" },
+		{ on = "u", run = "unmount" },
+		{ on = "e", run = "eject" },
 	},
-	partitions = {},
-	cursor = 0,
-	visible = false,
 }
 
 function M:new(area)
@@ -35,7 +74,7 @@ function M:new(area)
 end
 
 function M:layout(area)
-	local main_chunks = ui.Layout()
+	local chunks = ui.Layout()
 		:constraints({
 			ui.Constraint.Percentage(10),
 			ui.Constraint.Percentage(80),
@@ -50,139 +89,73 @@ function M:layout(area)
 			ui.Constraint.Percentage(80),
 			ui.Constraint.Percentage(10),
 		})
-		:split(main_chunks[2])
+		:split(chunks[2])
 
 	self._area = chunks[2]
 end
 
 function M:entry(job)
 	if job.args[1] == "refresh" then
-		return self:update_partitions(self:obtain())
+		return update_partitions(self.obtain())
 	end
 
-	self:toggle_ui()
-	if not self.visible then
-		return
-	end
+	toggle_ui()
+	update_partitions(self.obtain())
+	subscribe()
 
-	self:update_partitions(self:obtain())
-	self:subscribe()
+	local tx1, rx1 = ya.chan("mpsc")
+	local tx2, rx2 = ya.chan("mpsc")
 
-	async.run(function()
-		while self.visible do
-			local result = Yazi.which({ cands = self.keys, silent = true })
-			if not result then
-				break
-			end
-
-			local cand = self.keys[result] or { run = {} }
-			local runs = type(cand.run) == "table" and cand.run or { cand.run }
-
-			for _, r in ipairs(runs) do
+	function producer()
+		while true do
+			local cand = self.keys[ya.which { cands = self.keys, silent = true }] or { run = {} }
+			for _, r in ipairs(type(cand.run) == "table" and cand.run or { cand.run }) do
+				tx1:send(r)
 				if r == "quit" then
-					self:toggle_ui()
-					break
-				elseif r == "up" then
-					self:update_cursor(-1)
-				elseif r == "down" then
-					self:update_cursor(1)
-				elseif r == "enter" then
-					local active = self:active_partition()
-					if active and active.dist then
-						Yazi:cd(active.dist)
-					end
-				elseif r == "mount" then
-					self:operate("mount")
-				elseif r == "unmount" then
-					self:operate("unmount")
-				elseif r == "eject" then
-					self:operate("eject")
+					toggle_ui()
+					return
 				end
 			end
 		end
-		self:toggle_ui() -- Ensure UI is hidden on break
-	end)
-end
-
-function M:toggle_ui()
-	self.visible = not self.visible
-	if self.visible then
-		Yazi.modal_show(self)
-	else
-		Yazi.modal_hide()
-	end
-	Yazi.render()
-end
-
-function M:subscribe()
-	event.off("mount") -- Unsubscribe from previous listeners
-	event.on("mount", function()
-		Plugin:emit("refresh")
-	end)
-end
-
-function M:update_partitions(partitions)
-	self.partitions = partitions
-	if #self.partitions == 0 then
-		self.cursor = 0
-	else
-		self.cursor = math.max(0, math.min(self.cursor or 0, #self.partitions - 1))
-	end
-	Yazi.render()
-end
-
-function M:active_partition()
-	return self.partitions[self.cursor + 1]
-end
-
-function M:update_cursor(delta)
-	if #self.partitions == 0 then
-		self.cursor = 0
-	else
-		self.cursor = ya.clamp(0, self.cursor + delta, #self.partitions - 1)
-	end
-	Yazi.render()
-end
-
-function M:operate(op_type)
-	local active = self:active_partition()
-	if not active then
-		return self:fail("No active partition selected.")
-	end
-	if not active.sub then
-		return self:fail("Operating on main disks is not supported.")
 	end
 
-	async.run(function()
-		local result
-		if Yazi.target_os == "macos" then
-			result = child_process.command({ "diskutil", op_type, active.src })
-		elseif Yazi.target_os == "linux" then
-			if op_type == "eject" then
-				child_process.command({ "udisksctl", "unmount", "-b", active.src })
-				result = child_process.command({ "udisksctl", "power-off", "-b", active.src })
+	function consumer1()
+		repeat
+			local run = rx1:recv()
+			if run == "quit" then
+				tx2:send(run)
+				break
+			elseif run == "up" then
+				update_cursor(-1)
+			elseif run == "down" then
+				update_cursor(1)
+			elseif run == "enter" then
+				local active = active_partition()
+				if active and active.dist then
+					ya.emit("cd", { active.dist })
+				end
 			else
-				result = child_process.command({ "udisksctl", op_type, "-b", active.src })
+				tx2:send(run)
 			end
-		else
-			return self:fail("Unsupported OS for mount operations.")
-		end
+		until not run
+	end
 
-		if not result or not result.status.success then
-			self:fail("Failed to %s `%s`: %s", op_type, active.src, result and result.stderr or "Unknown error")
-		else
-			Plugin:emit("refresh")
-		end
-	end)
-end
+	function consumer2()
+		repeat
+			local run = rx2:recv()
+			if run == "quit" then
+				break
+			elseif run == "mount" then
+				self.operate("mount")
+			elseif run == "unmount" then
+				self.operate("unmount")
+			elseif run == "eject" then
+				self.operate("eject")
+			end
+		until not run
+	end
 
-function M:fail(s, ...)
-	Yazi.notify({
-		title = "Mount",
-		content = string.format(s, ...),
-		timeout = 10,
-		level = "error",
-	})
+	ya.join(producer, consumer1, consumer2)
 end
 
 function M:reflow()
@@ -193,40 +166,40 @@ function M:redraw()
 	local rows = {}
 	for _, p in ipairs(self.partitions or {}) do
 		if not p.sub then
-			rows[#rows + 1] = ui.Row({ p.main })
+			rows[#rows + 1] = ui.Row { p.main }
 		elseif p.sub == "" then
-			rows[#rows + 1] = ui.Row({ p.main, p.label or "", p.dist or "", p.fstype or "" })
+			rows[#rows + 1] = ui.Row { p.main, p.label or "", p.dist or "", p.fstype or "" }
 		else
-			rows[#rows + 1] = ui.Row({ "  " .. p.sub, p.label or "", p.dist or "", p.fstype or "" })
+			rows[#rows + 1] = ui.Row { "  " .. p.sub, p.label or "", p.dist or "", p.fstype or "" }
 		end
 	end
 
 	return {
 		ui.Clear(self._area),
-		ui.Border(ui.Border.ALL)
+		ui.Border(ui.Edge.ALL)
 			:area(self._area)
 			:type(ui.Border.ROUNDED)
-			:style(ui.Style().fg("blue"))
-			:title(ui.Line("Mount"):align(ui.Line.CENTER)),
+			:style(ui.Style():fg("blue"))
+			:title(ui.Line("Mount"):align(ui.Align.CENTER)),
 		ui.Table(rows)
 			:area(self._area:pad(ui.Pad(1, 2, 1, 2)))
-			:header(ui.Row({ "Src", "Label", "Dist", "FSType" }):style(ui.Style().bold()))
+			:header(ui.Row({ "Src", "Label", "Dist", "FSType" }):style(ui.Style():bold()))
 			:row(self.cursor)
-			:row_style(ui.Style().fg("blue"):underline())
-			:widths({
+			:row_style(ui.Style():fg("blue"):underline())
+			:widths {
 				ui.Constraint.Length(20),
 				ui.Constraint.Length(20),
 				ui.Constraint.Percentage(70),
 				ui.Constraint.Length(10),
-			}),
+			},
 	}
 end
 
-function M:obtain()
+function M.obtain()
 	local tbl = {}
 	local last
 	for _, p in ipairs(fs.partitions()) do
-		local main, sub = self:split(p.src)
+		local main, sub = M.split(p.src)
 		if main and last ~= main then
 			if p.src == main then
 				last, p.main, p.sub, tbl[#tbl + 1] = p.src, p.src, "", p
@@ -241,7 +214,8 @@ function M:obtain()
 			p.main, p.sub, tbl[#tbl + 1] = main, sub, p
 		end
 	end
-	table.sort(self:fillin(tbl), function(a, b)
+
+	table.sort(M.fillin(tbl), function(a, b)
 		if a.main == b.main then
 			return (a.sub or "") < (b.sub or "")
 		else
@@ -251,7 +225,7 @@ function M:obtain()
 	return tbl
 end
 
-function M:split(src)
+function M.split(src)
 	local pats = {
 		{ "^/dev/sd[a-z]", "%d+$" }, -- /dev/sda1
 		{ "^/dev/nvme%d+n%d+", "p%d+$" }, -- /dev/nvme0n1p1
@@ -266,8 +240,8 @@ function M:split(src)
 	end
 end
 
-function M:fillin(tbl)
-	if Yazi.target_os ~= "linux" then
+function M.fillin(tbl)
+	if ya.target_os() ~= "linux" then
 		return tbl
 	end
 
@@ -281,24 +255,49 @@ function M:fillin(tbl)
 		return tbl
 	end
 
-	local result = async.sync(function()
-		return child_process.command({ "lsblk", "-p", "-o", "name,fstype", "-J", unpack(sources) })
-	end)
-
-	if not result.status.success then
-		Yazi.log_debug("Failed to fetch filesystem types for unmounted partitions: " .. result.stderr)
+	local output, err = Command("lsblk"):arg({ "-p", "-o", "name,fstype", "-J" }):arg(sources):output()
+	if err then
+		ya.dbg("Failed to fetch filesystem types for unmounted partitions: " .. err)
 		return tbl
 	end
 
-	local t = Yazi.json_decode(result.stdout or "")
-	if t and t.blockdevices then
-		for _, p in ipairs(t.blockdevices) do
-			if indices[p.name] then
-				tbl[indices[p.name]].fstype = p.fstype
-			end
-		end
+	local t = ya.json_decode(output and output.stdout or "")
+	for _, p in ipairs(t and t.blockdevices or {}) do
+		tbl[indices[p.name]].fstype = p.fstype
 	end
 	return tbl
+end
+
+function M.operate(type)
+	local active = active_partition()
+	if not active then
+		return
+	elseif not active.sub then
+		return -- TODO: mount/unmount main disk
+	end
+
+	local output, err
+	if ya.target_os() == "macos" then
+		output, err = Command("diskutil"):arg({ type, active.src }):output()
+	end
+	if ya.target_os() == "linux" then
+		if type == "eject" then
+			Command("udisksctl"):arg({ "unmount", "-b", active.src }):status()
+			output, err = Command("udisksctl"):arg({ "power-off", "-b", active.src }):output()
+		else
+			output, err = Command("udisksctl"):arg({ type, "-b", active.src }):output()
+		end
+	end
+
+	if not output then
+		M.fail("Failed to %s `%s`: %s", type, active.src, err)
+	elseif not output.status.success then
+		M.fail("Failed to %s `%s`: %s", type, active.src, output.stderr)
+	end
+end
+
+function M.fail(...)
+	ya.notify { title = "Mount", content = string.format(...), timeout = 10, level = "error" }
 end
 
 function M:click() end
